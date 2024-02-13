@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from aws.service import upload_from_base64
 from message.schemas import MessageRead, MemberRead
-from models.models import *
+from models.models import room, user, message, room_user
 from user.crud import get_user_by_id
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,10 @@ async def upload_message_with_file_to_room(session: AsyncSession,
         room_id = (await session.execute(select(room).filter_by(room_name=room_name))).scalar_one()
         user_id = (await session.execute(select(user).filter_by(username=user_name))).scalar_one()
         media_file_url = await upload_from_base64(base64_data, file_type)
-        media_file_url = "https://f003.backblazeb2.com/file/gleb-bucket/" + media_file_url.file_name
+        if "https" not in media_file_url.file_name:
+            media_file_url = "https://f003.backblazeb2.com/file/gleb-bucket/" + media_file_url.file_name
+        else:
+            media_file_url = media_file_url.file_name
         await session.execute(
             insert(message).values(user=user_id, room=room_id, message_data=" ", media_file_url=media_file_url, ))
         await session.commit()
