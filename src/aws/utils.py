@@ -1,8 +1,10 @@
 import logging
+from typing import Optional
+
+from botocore.exceptions import ClientError
 
 from src.aws.client import client
 from src.config import AWS_BUCKET
-from botocore.exceptions import ClientError
 
 
 async def s3_upload(contents: bytes, key: str) -> None:
@@ -15,6 +17,15 @@ async def s3_upload(contents: bytes, key: str) -> None:
         logging.info(f'{key} successfully uploaded to S3')
     except Exception as e:
         logging.error(f'Error uploading {key} to S3: {str(e)}')
+
+
+async def s3_URL(key: str) -> Optional[str]:
+    try:
+        url = client.generate_presigned_url('get_object', Params={'Bucket': AWS_BUCKET, 'Key': key})
+        return url
+    except ClientError as e:
+        print(f"Error generating presigned URL: {str(e)}")
+        return None
 
 
 async def s3_download(key: str) -> bytes:
