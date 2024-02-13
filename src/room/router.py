@@ -1,18 +1,30 @@
-import logging
-
-from fastapi import APIRouter, Depends, Request
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, Request, HTTPException, status
 
 from auth.base_config import fastapi_users
 from auth.schemas import UserRead
 from database import get_async_session
 from ratelimiter import limiter
-from room.crud import add_user_to_room, get_rooms, filter_rooms, delete_room, get_user_favorite, \
-    get_user_favorite_like_room_name, alter_favorite
-from room.schemas import FavoriteRequest
+from room.crud import *
+from room.schemas import RoomCreateRequest, FavoriteRequest
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+@router.post("/room")
+@limiter.limit("1000/minute")
+async def create_room(request: Request,
+                      createrequest: RoomCreateRequest,
+                      current_user: UserRead = Depends(fastapi_users.current_user()),
+                      session: AsyncSession = Depends(get_async_session)):
+    """
+    Create a room
+    """
+    try:
+        res = await insert_room(session, current_user.username, createrequest.room_name)
+        return res
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
 
 @router.put("/room/{room_name}")
@@ -48,6 +60,15 @@ async def filter_out_rooms(room_name: str, page: int = 1, limit: int = 10,
     """
     rooms = await filter_rooms(session, current_user.id, room_name, page, limit)
     return rooms
+
+
+@router.get("/room/{room_name}", dependencies=[Depends(fastapi_users.current_user())])
+async def get_single_room(room_name: str, session: AsyncSession = Depends(get_async_session)):
+    """
+    Get Room by room name
+    """
+    selected_room = await get_room(session, room_name)
+    return selected_room
 
 
 @router.delete("/room/{room_name}", dependencies=[Depends(fastapi_users.current_user())])
