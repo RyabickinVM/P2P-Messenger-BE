@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from auth.base_config import fastapi_users
 from auth.schemas import UserRead
 from database import get_async_session
-from src.user.crud import update_user_data, update_user_image
-from src.user.schemas import UserUpdateRequest, UserBaseReadRequest
+from user.crud import update_user_image, update_user_data
+from user.schemas import UserUpdateRequest, UserBaseReadRequest
 
 router = APIRouter()
 
@@ -34,6 +34,3 @@ async def upload_profile_picture(
     Upload a profile picture for the current user
     """
     return await update_user_image(session, current_user, file)
-
-
-
