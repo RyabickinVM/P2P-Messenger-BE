@@ -19,3 +19,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(chat_router.router, tags=["chat"])
+
+app.include_router(router, prefix="/api")
+
+current_user = fastapi_users.current_user()
