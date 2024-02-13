@@ -1,6 +1,6 @@
 import boto3
 
-from src.config import ENDPOINT, KEY_ID_RO, APPLICATION_KEY_RO
+from config import ENDPOINT, KEY_ID_RO, APPLICATION_KEY_RO
 
 client = boto3.client(
     service_name='s3',

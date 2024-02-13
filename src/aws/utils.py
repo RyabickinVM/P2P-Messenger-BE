@@ -3,8 +3,8 @@ from typing import Optional
 
 from botocore.exceptions import ClientError
 
-from src.aws.client import client
-from src.config import AWS_BUCKET
+from aws.client import client
+from config import AWS_BUCKET
 
 
 async def s3_upload(contents: bytes, key: str) -> None:
