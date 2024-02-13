@@ -6,8 +6,10 @@ from sqlalchemy import select, insert, delete, and_, update
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from message.crud import get_messages_in_room
 from models.models import room, user, room_user, message
-from room.schemas import RoomBaseInfoForUserRequest, FavoriteRequest, RoomBaseInfoForAllUserRequest
+from room.schemas import RoomBaseInfoForUserRequest, FavoriteRequest, RoomBaseInfoForAllUserRequest, RoomReadRequest
+from user.crud import get_users_in_room
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +113,26 @@ async def set_room_activity(session: AsyncSession, room_name: str, activity_bool
     except Exception as e:
         logger.error(f"Error setting room activity: {e}")
         await session.rollback()
+        return None
+
+
+async def get_room(session: AsyncSession, room_name: str) -> Optional[RoomReadRequest]:
+    try:
+        room_instance = (await session.execute(select(room).filter_by(room_name=room_name))).one()
+        room_id = room_instance.room_id
+        members = await get_users_in_room(session, room_id)
+        messages = await get_messages_in_room(session, room_id)
+        await session.commit()
+        return RoomReadRequest(
+            room_id=room_instance.room_id,
+            room_name=room_instance.room_name,
+            members=members,
+            messages=messages,
+            room_active=room_instance.is_active,
+            room_creation_date=room_instance.creation_date
+        )
+    except Exception as e:
+        logger.error(f"Error getting room: {e}")
         return None
 
 
