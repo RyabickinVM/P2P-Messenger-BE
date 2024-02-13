@@ -1,3 +1,4 @@
+import base64
 from io import BytesIO
 from typing import Optional
 from uuid import uuid4
@@ -29,6 +30,69 @@ async def compress_image(file_type: str, image_data: bytes) -> bytes:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f'Error compressing image: {str(e)}'
         )
+
+
+async def upload_from_base64(base64_data: str, file_type: str) -> Optional[FileRead]:
+    if not base64_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Base64 data not found!'
+        )
+
+    contents = base64.b64decode(base64_data)
+    size = len(contents)
+
+    if file_type in SUPPORTED_FILE_TYPES_FORM_AUDIO:
+        max_size = 8 * MB
+        error_message = f'Audio file size exceeds the maximum allowed one of {max_size / MB} MB. Try another one.'
+
+    elif file_type in SUPPORTED_FILE_TYPES_FORM_VIDEO:
+        max_size = 50 * MB
+        error_message = f'Video file size exceeds the maximum allowed one of {max_size / MB} MB. Try another one.'
+
+        container = av.open(BytesIO(contents))
+        video_stream_info = container.streams.video[0]
+        width = video_stream_info.width
+        height = video_stream_info.height
+
+        resize_flag = width >= 1920 or height >= 1080
+        size_flag = size >= 8 * MB
+
+        if resize_flag or size_flag:
+            return await compress_video(contents, file_type)
+
+    elif file_type in SUPPORTED_FILE_TYPES_FORM_IMAGE:
+        max_size = 10 * MB
+        error_message = 'Image file size should not exceed 10 MB.'
+        img = Image.open(BytesIO(contents))
+        width, height = img.size
+
+        if width <= 100 or height <= 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='Image size is too small. More than 100x100 is required.'
+            )
+        if (width > 2048 or height > 1080) or (1 * MB <= size <= 10 * MB):
+            contents = compress_image(file_type, contents)
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'Unsupported file type: {file_type}. '
+                   f'Supported types are {SUPPORTED_FILE_TYPES_FORM_AUDIO}'
+                   f'{SUPPORTED_FILE_TYPES_FORM_VIDEO}'
+                   f'{SUPPORTED_FILE_TYPES_FORM_IMAGE}'
+        )
+
+    if size > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message
+        )
+
+    file_name = f'{uuid4()}.{SUPPORTED_FILE_TYPES_FORM_APPLICATION[file_type]}'
+    await s3_upload(contents=contents, key=file_name)
+    return FileRead(file_name=file_name)
 
 
 async def upload(file: Optional[UploadFile] = None) -> Optional[FileRead]:
