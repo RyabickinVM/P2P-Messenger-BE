@@ -1,8 +1,10 @@
 import base64
+import time
 from io import BytesIO
 from typing import Optional
 from uuid import uuid4
 
+import av
 import magic
 from PIL import Image
 from fastapi import HTTPException, Response, UploadFile, status
@@ -11,6 +13,90 @@ from aws.constants import MB, SUPPORTED_FILE_TYPES_FORM_IMAGE, SUPPORTED_FILE_TY
     SUPPORTED_FILE_TYPES_FORM_VIDEO, SUPPORTED_FILE_TYPES_FORM_APPLICATION
 from aws.schemas import FileRead
 from aws.utils import s3_download, s3_upload, s3_URL
+
+import shotstack_sdk
+from shotstack_sdk.api import edit_api
+from shotstack_sdk.model.clip import Clip
+from shotstack_sdk.model.edit import Edit
+from shotstack_sdk.model.output import Output
+from shotstack_sdk.model.timeline import Timeline
+from shotstack_sdk.model.track import Track
+from shotstack_sdk.model.video_asset import VideoAsset
+import certifi
+
+
+async def compress_video(video_data: bytes, file_type: str) -> FileRead:
+    file_name = f'{uuid4()}.{SUPPORTED_FILE_TYPES_FORM_APPLICATION[file_type]}'
+    await s3_upload(contents=video_data, key=file_name)
+
+    current_video_url_in_backblaze = await get_url(file_name)
+
+    configuration = shotstack_sdk.Configuration(host='https://api.shotstack.io/stage')
+    configuration.ssl_ca_cert = certifi.where()
+    configuration.verify_ssl = False
+    configuration.api_key['DeveloperKey'] = 'Ih6eOAplvIx9B0eZ2KkfKkDY1i3RVO7AbtLVhPeG'
+
+    with shotstack_sdk.ApiClient(configuration) as api_client:
+        api_instance = edit_api.EditApi(api_client)
+
+        api_response = api_instance.probe(current_video_url_in_backblaze)
+
+        streams = api_response['response']['metadata']['streams']
+
+        duration = None
+        for stream in streams:
+            if stream['codec_type'] == "video":
+                duration = stream['duration']
+
+        video_asset = VideoAsset(
+            src=current_video_url_in_backblaze
+        )
+
+        video_clip = Clip(
+            asset=video_asset,
+            start=0.0,
+            length=float(duration)
+        )
+
+        track = Track(clips=[video_clip])
+
+        timeline = Timeline(
+            background="#000000",
+            tracks=[track]
+        )
+
+        output = Output(
+            format="mp4",
+            resolution="sd"
+        )
+
+        edit = Edit(
+            timeline=timeline,
+            output=output
+        )
+
+        url = None
+        try:
+            api_id = api_instance.post_render(edit)
+            id = api_id['response']['id']
+
+            api_response = api_instance.get_render(id, data=False, merged=True)
+            time.sleep(10)
+            status = api_response['response']['status']
+            print('Status: ' + status.upper() + '\n')
+
+            if status == "done":
+                url = api_response['response']['url']
+            elif status == 'failed':
+                print(">> Something went wrong, rendering has terminated and will not continue.")
+            else:
+                print(
+                    ">> Rendering in progress, please try again shortly.\n>> Note: Rendering may take up to 1 minute "
+                    "to complete.")
+        except Exception as e:
+            print(f"Unable to resolve API call: {e}")
+
+    return FileRead(file_name=str(url))
 
 
 async def compress_image(file_type: str, image_data: bytes) -> bytes:
@@ -126,7 +212,7 @@ async def upload(file: Optional[UploadFile] = None) -> Optional[FileRead]:
                     detail='Image file size should not exceed 10 MB. '
                 )
             file_name = f'{uuid4()}.{SUPPORTED_FILE_TYPES_FORM_APPLICATION[file_type]}'
-        except Exception:
+        except Exception as e:
             print("Compression failed.")
             pass
     else:
