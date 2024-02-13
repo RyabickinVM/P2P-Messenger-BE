@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.schemas import UserRead
 from aws.service import upload, get_url
-from src.models.models import user, room_user
-from src.user.schemas import UserReadRequest, UserBaseReadRequest, UserUpdateRequest
+from models.models import user, room_user
+from user.schemas import UserReadRequest, UserBaseReadRequest, UserUpdateRequest
 
 logger = logging.getLogger(__name__)
 
