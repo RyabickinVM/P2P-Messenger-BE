@@ -16,3 +16,5 @@ APPLICATION_KEY_RO = os.environ.get("APPLICATION_KEY_RO")
 AWS_BUCKET = os.environ.get("AWS_BUCKET")
 
 SECRET_AUTH = os.environ.get("SECRET_AUTH")
+
+SHOTSTACK_API = os.environ.get("SHOTSTACK_API")
