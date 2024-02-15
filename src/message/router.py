@@ -50,25 +50,28 @@ async def websocket_endpoint(
             if websocket.application_state == WebSocketState.CONNECTED:
                 data = await websocket.receive_text()
                 message_data = json.loads(data)
-                content = message_data["content"]
+                message = message_data["message"]
                 if "type" in message_data and message_data["type"] == "file":
+                    content = message_data["content"]
                     file_type = message_data["fileType"]
-                    media_file_url = await upload_message_with_file_to_room(session, room_name, user_name, content,
+                    media_file_url = await upload_message_with_file_to_room(session,
+                                                                            room_name, user_name,
+                                                                            message, content,
                                                                             file_type)
                     file_data = {
-                        "content": " ",
+                        "message": message,
                         "media_file_url": media_file_url,
                         "user": {"username": user_name},
                         "type": "file",
                     }
                     await manager.broadcast(f"{json.dumps(file_data, default=str)}")
                 else:
-                    await upload_message_to_room(session, room_name, user_name, content)
+                    await upload_message_to_room(session, room_name, user_name, message)
                     await manager.broadcast(f"{data}")
     except WebSocketDisconnect as ex:
         template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-        message = template.format(type(ex).__name__, ex.args)
-        logger.error(message)
+        error_message = template.format(type(ex).__name__, ex.args)
+        logger.error(error_message)
         logger.warning("Disconnecting Websocket")
         await set_user_room_activity(session, user_name, room_name, False)
         await manager.disconnect(session, websocket, room_name)

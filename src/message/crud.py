@@ -28,6 +28,7 @@ async def upload_message_to_room(session: AsyncSession, room_name: str, user_nam
 async def upload_message_with_file_to_room(session: AsyncSession,
                                            room_name: str,
                                            user_name: str,
+                                           data_message:str,
                                            base64_data: str,
                                            file_type: str) -> str:
     try:
@@ -39,7 +40,7 @@ async def upload_message_with_file_to_room(session: AsyncSession,
         else:
             media_file_url = media_file_url.file_name
         await session.execute(
-            insert(message).values(user=user_id, room=room_id, message_data=" ", media_file_url=media_file_url, ))
+            insert(message).values(user=user_id, room=room_id, message_data=data_message, media_file_url=media_file_url, ))
         await session.commit()
         return media_file_url
     except Exception as e:
@@ -58,7 +59,7 @@ async def get_messages_in_room(session: AsyncSession, room_id: int) -> List[Mess
     for row in rows:
         user_read_request = await get_user_by_id(session, row[4])
         messages.append(MessageRead(
-            content=row[1],
+            message=row[1],
             media_file_url=row[2],
             user=user_read_request,
         ))
