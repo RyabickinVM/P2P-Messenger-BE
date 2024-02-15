@@ -6,7 +6,7 @@ from user.schemas import UserReadRequest
 
 
 class MessageRead(BaseModel):
-    content: str
+    message: str
     media_file_url: Optional[str]
     user: UserReadRequest
 
