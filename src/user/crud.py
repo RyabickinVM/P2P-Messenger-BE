@@ -2,14 +2,13 @@ import logging
 from typing import List, Optional
 
 from fastapi import UploadFile
-from fastapi_users.password import PasswordHelper
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.schemas import UserRead
 from aws.service import upload, get_url
 from models.models import user, room_user
-from user.schemas import UserReadRequest, UserBaseReadRequest, UserUpdateRequest
+from user.schemas import UserReadRequest, UserBaseReadRequest
 
 logger = logging.getLogger(__name__)
 
@@ -68,26 +67,6 @@ async def update_user_image(
         await session.commit()
         return UserBaseReadRequest(user_id=current_user.id, username=current_user.username,
                                    image_url=current_user.image_url)
-    except Exception as e:
-        logger.error(f"Error updating user: {e}")
-        await session.rollback()
-        return None
-
-
-async def update_user_data(
-        session: AsyncSession, current_user: UserRead, request: UserUpdateRequest
-) -> None:
-    try:
-        await session.execute(
-            update(user)
-            .where(user.c.id == current_user.id)
-            .values(username=request.username,
-                    hashed_password=PasswordHelper().hash(request.password),
-                    last_name=request.last_name,
-                    first_name=request.first_name,
-                    surname=request.surname)
-        )
-        await session.commit()
     except Exception as e:
         logger.error(f"Error updating user: {e}")
         await session.rollback()
